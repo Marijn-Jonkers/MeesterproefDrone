@@ -273,7 +273,7 @@
                     "isPartOfComposite": true
                 },
                 {
-                    "name": "CtrlSpace",
+                    "name": "ShftSpace",
                     "id": "e027ded9-c927-4e9c-92e3-6ae981a075a3",
                     "path": "1DAxis",
                     "interactions": "",
@@ -286,7 +286,7 @@
                 {
                     "name": "negative",
                     "id": "0bf392ab-0061-4e13-9f66-10c8ab129b9d",
-                    "path": "<Keyboard>/ctrl",
+                    "path": "<Keyboard>/shift",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
