@@ -7,7 +7,13 @@ public class Alarm : MonoBehaviour
     public bool alarm = false;
     public Vector3 locatie;
     public GameObject target;
+    public GameObject TopCam;
+    public GameObject UI;
 
+    private void Start()
+    {
+        UI.SetActive(false);
+    }
     void Update()
     {
         if (Input.GetMouseButtonDown(0)) // Left mouse button click
@@ -19,7 +25,6 @@ public class Alarm : MonoBehaviour
             {
                 locatie = hit.point;
                 Debug.Log("Clicked location: " + locatie);
-                Instantiate(target, locatie, new Quaternion());
 
                 // Set the alarm when clicking on a valid object
                 SetAlarm();
@@ -34,12 +39,16 @@ public class Alarm : MonoBehaviour
     public void SetAlarm()
     {
         alarm = true;
+        TopCam.SetActive(false);
+        UI.SetActive(true);
         Debug.Log("Het alarm is afgezet op " + locatie);
     }
 
     public void ResetAlarm()
     {
         alarm = false;
+        TopCam.SetActive(true);
+        UI.SetActive(false);
         Debug.Log("Het alarm is uit gezet");
     }
 }

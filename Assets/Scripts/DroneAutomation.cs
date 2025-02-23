@@ -20,6 +20,9 @@ public class DroneAutomation : MonoBehaviour
     private Plane[] frustumPlanes;
     private Camera droneCameraComponent;
 
+    public float UIdist;
+    public UIManager UI;
+
 
 
     LineRenderer laserLine;
@@ -74,6 +77,7 @@ public class DroneAutomation : MonoBehaviour
 
         while (timePassed < deltaTime)
         {
+            UI.Message("Alarm", "Op zoek naar potentieel doelwit");
             timePassed += Time.deltaTime;
             transform.position += deltaPosition * (Time.deltaTime / deltaTime);
 
@@ -116,6 +120,8 @@ public class DroneAutomation : MonoBehaviour
             Vector3 cameraDirection = (target - droneCamera.transform.position).normalized;
             Quaternion cameraRotation = Quaternion.LookRotation(cameraDirection);
             droneCamera.transform.rotation = Quaternion.Slerp(droneCamera.transform.rotation, cameraRotation, Time.deltaTime * rotationSpeed);
+
+            UIdist = Vector3.Distance(new Vector3(target.x, 0, target.z), new Vector3(transform.position.x, 0, transform.position.z));
 
             yield return null;
         }
@@ -178,6 +184,7 @@ public class DroneAutomation : MonoBehaviour
         if (trackingCoroutine != null) yield break; // Prevent multiple tracking coroutines
 
         trackingCoroutine = StartCoroutine(TrackTargetRoutine(target));
+        UI.Message("Doelwit gevonden", "Achtervolging doelwit geinitialiseerd");
     }
 
     IEnumerator TrackTargetRoutine(GameObject target)
@@ -192,6 +199,7 @@ public class DroneAutomation : MonoBehaviour
             while (timePassed < deltaTime)
             {
                 distance = Vector3.Distance(new Vector3(target.transform.position.x, 10, target.transform.position.z), transform.position);
+                UIdist = distance;
                 deltaTime = distance / maxSpeed;
                 targetPosition = new Vector3(target.transform.position.x, 10, target.transform.position.z);
                 timePassed += Time.deltaTime;
@@ -212,6 +220,7 @@ public class DroneAutomation : MonoBehaviour
                 Vector3 cameraDirection = (target.transform.position - droneCamera.transform.position).normalized;
                 Quaternion cameraRotation = Quaternion.LookRotation(cameraDirection);
                 droneCamera.transform.rotation = Quaternion.Slerp(droneCamera.transform.rotation, cameraRotation, Time.deltaTime * rotationSpeed);
+
 
                 yield return null;
             }
