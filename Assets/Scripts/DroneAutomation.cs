@@ -16,6 +16,7 @@ public class DroneAutomation : MonoBehaviour
     private Coroutine trackingCoroutine;
     private Coroutine takeOffCoroutine;
     private Coroutine flyToTargetCoroutine;
+    private Coroutine orbitCoroutine;
 
     private Plane[] frustumPlanes;
     private Camera droneCameraComponent;
@@ -126,6 +127,10 @@ public class DroneAutomation : MonoBehaviour
             yield return null;
         }
 
+        yield return StartCoroutine(FlyToTarget(target));
+        orbitCoroutine = StartCoroutine(OrbitPoint(target));
+
+
         flyToTargetCoroutine = null;
     }
     IEnumerator CheckForTarget()
@@ -228,6 +233,62 @@ public class DroneAutomation : MonoBehaviour
             yield return null;
         }
     }
+
+    IEnumerator OrbitPoint(Vector3 target)
+    {
+        float targetSpeed = 1.0f; // Vmax
+        float timePassed = 0f;
+        float theta = 0f; // Initial angle
+        Vector3 orbitCenter = new Vector3(target.x, takeOffHeight, target.z);
+
+        while (true) // Continue orbiting until the target is found
+        {
+            timePassed += Time.deltaTime;
+
+            // Compute radius based on target's speed
+            float R = targetSpeed * timePassed;
+
+            // Ensure the drone's speed does not exceed maxSpeed
+            if (maxSpeed <= targetSpeed)
+            {
+                Debug.Log("Drone cannot keep up with the target speed!");
+                yield break;
+            }
+
+            // Compute angular velocity to stay within maxSpeed
+            float angularVelocity = Mathf.Sqrt(maxSpeed * maxSpeed - targetSpeed * targetSpeed) / (targetSpeed * timePassed);
+
+            // Update theta
+            theta += angularVelocity * Time.deltaTime;
+
+            // Compute new position
+            float x = R * Mathf.Cos(theta) + orbitCenter.x;
+            float z = R * Mathf.Sin(theta) + orbitCenter.z;
+            Vector3 newPosition = new Vector3(x, orbitCenter.y, z);
+
+            // Move the drone
+            transform.position = newPosition;
+
+            // Make the drone face the target
+            Vector3 direction = (orbitCenter - transform.position).normalized;
+            direction.y = 0; // Lock rotation to Y-axis
+            if (direction != Vector3.zero)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(direction);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * rotationSpeed);
+            }
+
+            // Exit orbit if target is found
+            if (trackingCoroutine != null)
+            {
+                Debug.Log("Target found, exiting orbit...");
+                yield break;
+            }
+
+            yield return null;
+        }
+    }
+
 
 
 }
