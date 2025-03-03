@@ -10,9 +10,12 @@ public class Alarm : MonoBehaviour
     public GameObject TopCam;
     public GameObject UI;
 
+    private CameraManager camMan;
+
     private void Start()
     {
         UI.SetActive(false);
+        camMan = GetComponent<CameraManager>();
     }
     void Update()
     {
@@ -23,11 +26,8 @@ public class Alarm : MonoBehaviour
 
             if (Physics.Raycast(ray, out hit))
             {
-                locatie = hit.point;
-                Debug.Log("Clicked location: " + locatie);
-
-                // Set the alarm when clicking on a valid object
-                SetAlarm();
+                target.transform.position = hit.point;
+                camMan.setActive(2);
             }
             else
             {

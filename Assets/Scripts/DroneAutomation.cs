@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
 
@@ -12,6 +13,8 @@ public class DroneAutomation : MonoBehaviour
     public GameObject droneCamera;
 
     public Alarm alarmObject;
+    public CameraManager CM;
+    public Security SG;
 
     private Coroutine trackingCoroutine;
     private Coroutine takeOffCoroutine;
@@ -73,8 +76,10 @@ public class DroneAutomation : MonoBehaviour
     IEnumerator TakeOff(Vector3 target)
     {
         float deltaTime = takeOffHeight / maxSpeed;
-        Vector3 deltaPosition = new Vector3(0, takeOffHeight, 0);
+        Vector3 deltaPosition = new Vector3(0, takeOffHeight - transform.position.y, 0);
         float timePassed = 0;
+        float distance = Vector3.Distance(new Vector3(target.x, 0, target.z), new Vector3(transform.position.x, 0, transform.position.z));
+        UIdist = distance;
 
         while (timePassed < deltaTime)
         {
@@ -109,30 +114,34 @@ public class DroneAutomation : MonoBehaviour
     {
         float distance = Vector3.Distance(new Vector3(target.x, 0, target.z), new Vector3(transform.position.x, 0, transform.position.z));
         float deltaTime = distance / maxSpeed;
-        Vector3 deltaPosition = new Vector3(target.x, 0, target.z);
+        Vector3 startPosition = transform.position;
         float timePassed = 0;
+        UIdist = distance;
 
         while (timePassed < deltaTime)
         {
             timePassed += Time.deltaTime;
-            transform.position += deltaPosition * (Time.deltaTime / deltaTime);
+            float t = timePassed / deltaTime;
+            transform.position = Vector3.Lerp(startPosition, new Vector3(target.x, transform.position.y, target.z), t);
 
             Vector3 direction = (target - transform.position).normalized;
-            Vector3 cameraDirection = (target - droneCamera.transform.position).normalized;
-            Quaternion cameraRotation = Quaternion.LookRotation(cameraDirection);
-            droneCamera.transform.rotation = Quaternion.Slerp(droneCamera.transform.rotation, cameraRotation, Time.deltaTime * rotationSpeed);
+            direction.y = 0; // Keep rotation in XZ plane
 
-            UIdist = Vector3.Distance(new Vector3(target.x, 0, target.z), new Vector3(transform.position.x, 0, transform.position.z));
+            if (direction != Vector3.zero)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(direction);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * rotationSpeed);
+            }
 
             yield return null;
         }
 
-        yield return StartCoroutine(FlyToTarget(target));
+        // Now start orbiting after reaching the target
         orbitCoroutine = StartCoroutine(OrbitPoint(target));
 
-
-        flyToTargetCoroutine = null;
+        flyToTargetCoroutine = null; // Cleanup
     }
+
     IEnumerator CheckForTarget()
     {
         while (true) // Continuously check for targets
@@ -153,12 +162,13 @@ public class DroneAutomation : MonoBehaviour
                         // Perform a Raycast to ensure there's no obstacle between the camera and the target
                         Vector3 directionToTarget = (target.transform.position - droneCamera.transform.position).normalized;
                         float distanceToTarget = Vector3.Distance(droneCamera.transform.position, target.transform.position);
+                        UIdist = distanceToTarget;
 
                         RaycastHit hit;
                         if (Physics.Raycast(droneCamera.transform.position, directionToTarget, out hit, distanceToTarget))
                         {
                             // If the hit object is not the target, then something is blocking the view
-                            if (hit.collider.gameObject != target.gameObject)
+                            if (hit.collider.gameObject != target.gameObject || distanceToTarget > 400f)
                             {
                                 Debug.Log("Target " + target.gameObject.name + " is blocked by " + hit.collider.gameObject.name);
                                 continue; // Skip this target since it's not visible
@@ -189,6 +199,8 @@ public class DroneAutomation : MonoBehaviour
         if (trackingCoroutine != null) yield break; // Prevent multiple tracking coroutines
 
         trackingCoroutine = StartCoroutine(TrackTargetRoutine(target));
+        SG.goForIt = true;
+        CM.setActive(3);
         UI.Message("Doelwit gevonden", "Achtervolging doelwit geinitialiseerd");
     }
 
@@ -233,62 +245,90 @@ public class DroneAutomation : MonoBehaviour
             yield return null;
         }
     }
-
     IEnumerator OrbitPoint(Vector3 target)
     {
-        float targetSpeed = 1.0f; // Vmax
-        float timePassed = 0f;
-        float theta = 0f; // Initial angle
+        float targetSpeed = 6f; // Adjust as needed
         Vector3 orbitCenter = new Vector3(target.x, takeOffHeight, target.z);
 
         while (true) // Continue orbiting until the target is found
         {
-            timePassed += Time.deltaTime;
+            // Calculate the radius ONCE at the start of the orbit
+            float radius = (targetSpeed * Time.timeSinceLevelLoad); // R = v*t + 15
+            float angularSpeed = Mathf.Sqrt((maxSpeed * maxSpeed) - (targetSpeed * targetSpeed)) / radius;
+            float orbitDuration = (2 * Mathf.PI) / angularSpeed; // Time for one full orbit
 
-            // Compute radius based on target's speed
-            float R = targetSpeed * timePassed;
+            Vector3 startOrbitPosition = orbitCenter + new Vector3(radius, 0, 0);
+            yield return StartCoroutine(FlyToOrbitStart(startOrbitPosition));
 
-            // Ensure the drone's speed does not exceed maxSpeed
-            if (maxSpeed <= targetSpeed)
+            Debug.Log($"Starting new orbit with radius: {radius}");
+
+            float elapsedTime = 0f;
+            float theta = 0f; // Start angle
+
+            while (elapsedTime < orbitDuration)
             {
-                Debug.Log("Drone cannot keep up with the target speed!");
-                yield break;
+                elapsedTime += Time.deltaTime;
+                theta += angularSpeed * Time.deltaTime; // Circular motion progression
+
+                float distance = Vector3.Distance(new Vector3(target.x, takeOffHeight, target.z), transform.position);
+                UIdist = distance;
+
+                // Compute new position using the constant radius
+                float x = radius * Mathf.Cos(theta) + orbitCenter.x;
+                float z = radius * Mathf.Sin(theta) + orbitCenter.z;
+                Vector3 newPosition = new Vector3(x, orbitCenter.y, z);
+
+                // Move the drone
+                transform.position = newPosition;
+
+                // Make the drone face the target
+                Vector3 direction = (orbitCenter - transform.position).normalized;
+                direction.y = 0; // Lock rotation to Y-axis
+                if (direction != Vector3.zero)
+                {
+                    Quaternion targetRotation = Quaternion.LookRotation(direction);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * rotationSpeed);
+                }
+
+                // Exit orbit if the target is found
+                if (trackingCoroutine != null)
+                {
+                    Debug.Log("Target found, exiting orbit...");
+                    yield break;
+                }
+
+                yield return null;
             }
 
-            // Compute angular velocity to stay within maxSpeed
-            float angularVelocity = Mathf.Sqrt(maxSpeed * maxSpeed - targetSpeed * targetSpeed) / (targetSpeed * timePassed);
+            // After one full orbit, the while loop restarts and recalculates the radius.
+        }
+    }
 
-            // Update theta
-            theta += angularVelocity * Time.deltaTime;
+    IEnumerator FlyToOrbitStart(Vector3 orbitStart)
+    {
+        float distance = Vector3.Distance(transform.position, orbitStart);
+        float travelTime = distance / maxSpeed;
+        float timePassed = 0;
 
-            // Compute new position
-            float x = R * Mathf.Cos(theta) + orbitCenter.x;
-            float z = R * Mathf.Sin(theta) + orbitCenter.z;
-            Vector3 newPosition = new Vector3(x, orbitCenter.y, z);
+        Vector3 startPosition = transform.position;
 
-            // Move the drone
-            transform.position = newPosition;
+        while (timePassed < travelTime)
+        {
+            timePassed += Time.deltaTime;
+            float t = timePassed / travelTime;
+            transform.position = Vector3.Lerp(startPosition, orbitStart, t);
 
-            // Make the drone face the target
-            Vector3 direction = (orbitCenter - transform.position).normalized;
-            direction.y = 0; // Lock rotation to Y-axis
+            // Rotate towards the orbit start point
+            Vector3 direction = (orbitStart - transform.position).normalized;
+            direction.y = 0;
             if (direction != Vector3.zero)
             {
                 Quaternion targetRotation = Quaternion.LookRotation(direction);
                 transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * rotationSpeed);
             }
 
-            // Exit orbit if target is found
-            if (trackingCoroutine != null)
-            {
-                Debug.Log("Target found, exiting orbit...");
-                yield break;
-            }
-
             yield return null;
         }
     }
-
-
 
 }
