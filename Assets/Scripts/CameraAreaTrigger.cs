@@ -13,7 +13,7 @@ public class CameraAreaTrigger : MonoBehaviour
             Alarm.SetAlarm();
             CM.setActive(1);
             Debug.Log("Target entered camera area: " + gameObject.name);
-            CA.RemoveCameraZones();
+            CA.RemoveAllCameraZones();
         }
     }
 }

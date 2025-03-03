@@ -9,9 +9,21 @@ public class CameraArea : MonoBehaviour
     public CameraManager CameraManager;
     private List<GameObject> cameraZones = new List<GameObject>();
 
+    private static List<CameraArea> allCameraAreas = new List<CameraArea>(); // Stores all CameraArea instances
+
+    void Awake()
+    {
+        allCameraAreas.Add(this); // Add this building to the global list
+    }
+
     void Start()
     {
         CreateCameraZones();
+    }
+
+    private void OnDestroy()
+    {
+        allCameraAreas.Remove(this); // Remove when object is destroyed
     }
 
     public void RemoveCameraZones()
@@ -19,6 +31,15 @@ public class CameraArea : MonoBehaviour
         foreach (GameObject zone in cameraZones)
         {
             Destroy(zone);
+        }
+        cameraZones.Clear();
+    }
+
+    public void RemoveAllCameraZones()
+    {
+        foreach (CameraArea ca in allCameraAreas)
+        {
+            ca.RemoveCameraZones();
         }
     }
 
@@ -47,7 +68,7 @@ public class CameraArea : MonoBehaviour
             // Add trigger script
             CameraAreaTrigger cat = zone.AddComponent<CameraAreaTrigger>();
             cat.Alarm = Alarm;
-            cat.CA = gameObject.GetComponent<CameraArea>();
+            cat.CA = this;
             cat.CM = CameraManager;
 
             // Make it semi-transparent green

@@ -8,6 +8,8 @@ public class Security : MonoBehaviour
     public bool goForIt = false;
     public float checkInterval = 0.5f; // How often to update path
     public bool Finish = false; // New boolean to check when reaching a target
+    public GameObject car;
+    public GameObject body;
 
     private NavMeshAgent agent;
     private Coroutine runCoroutine;
@@ -19,6 +21,8 @@ public class Security : MonoBehaviour
         if (!agent.isOnNavMesh)
         {
             Debug.LogError(gameObject.name + " is NOT on the NavMesh!");
+            car.SetActive(false);
+            body.SetActive(true);
             return;
         }
 
@@ -32,14 +36,29 @@ public class Security : MonoBehaviour
             Debug.LogError(gameObject.name + " is NOT on the NavMesh!");
         }
     }
-
+    void ToggleCar(bool toggle)
+    {
+        if (toggle)
+        {
+            car.SetActive(true);
+            body.SetActive(false);
+            agent.speed = 30f;
+            agent.acceleration = 15f;
+        } else
+        {
+            car.SetActive(false);
+            body.SetActive(true);
+            agent.speed = 10f;
+            agent.acceleration = 8f;
+        }
+    }
     IEnumerator RunTowardsDrone()
     {
         while (true)
         {
+            Vector3 newTarget = drone.position;
             if (goForIt && drone != null)
             {
-                Vector3 newTarget = drone.position;
 
                 // Try to find a point on the NavMesh near the drone
                 if (NavMesh.SamplePosition(newTarget, out NavMeshHit hit, 120.0f, NavMesh.AllAreas))
@@ -51,6 +70,15 @@ public class Security : MonoBehaviour
                     Debug.LogWarning("No valid NavMesh position near the drone.");
                 }
             }
+            float distance = Vector3.Distance(transform.position, newTarget);
+            if (distance < 40f)
+            {
+                ToggleCar(false);
+            } else
+            {
+                ToggleCar(true);
+            }
+
             yield return new WaitForSeconds(checkInterval);
         }
     }

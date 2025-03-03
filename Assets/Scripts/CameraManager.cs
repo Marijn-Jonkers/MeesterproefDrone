@@ -5,6 +5,7 @@ using UnityEngine;
 public class CameraManager : MonoBehaviour
 {
     public GameObject[] Cameras;
+    public GameObject DroneUI;
 
     private void Start()
     {
@@ -15,10 +16,11 @@ public class CameraManager : MonoBehaviour
     {
         for (int i = 0; i < Cameras.Length; i++)
         {
-            if(i == cam)
+            if (i == cam)
             {
                 Cameras[i].SetActive(true);
-            } else
+            }
+            else
             {
                 Cameras[i].SetActive(false);
             }
